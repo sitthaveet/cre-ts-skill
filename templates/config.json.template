@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "CRE Workflow Configuration Template - Copy to config/config.json",
+
+  "// INSTRUCTIONS": "Remove all comment fields (starting with //) before using",
+
+  "// API Configuration": "External API endpoints and settings",
+  "apiUrl": "https://api.example.com/v1",
+  "apiTimeout": 30000,
+
+  "// Blockchain Configuration": "Chain and contract settings",
+  "chainId": 1,
+  "contractAddress": "0x0000000000000000000000000000000000000000",
+  "targetContractAddress": "0x0000000000000000000000000000000000000000",
+
+  "// Feature Flags": "Enable/disable features",
+  "enableNotifications": true,
+  "enableLogging": true,
+  "debugMode": false,
+
+  "// Thresholds": "Configurable limits and thresholds",
+  "maxRetries": 3,
+  "alertThreshold": 100,
+  "minAmount": "1000000000000000000",
+
+  "// Webhook URLs": "Notification endpoints (use secrets for sensitive URLs)",
+  "notificationWebhook": "https://hooks.example.com/notifications"
+}

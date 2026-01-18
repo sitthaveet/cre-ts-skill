@@ -1,6 +1,6 @@
 ---
 name: cre-typescript
-description: Build CRE workflows in TypeScript - triggers, SDK, CLI, secrets, limits
+description: Build Chainlink Runtime Environment (CRE) workflows in TypeScript - triggers, SDK, CLI, secrets, limits
 ---
 
 # CRE TypeScript Skill

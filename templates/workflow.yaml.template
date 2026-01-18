@@ -1,90 +1,16 @@
-# CRE Workflow Configuration Template
-#
-# This file defines your workflow metadata and triggers.
-# Copy this file to your workflow directory as workflow.yaml
-#
-# Documentation: https://docs.chain.link/cre
-
-# Workflow metadata
-name: my-workflow                    # Unique identifier (required)
-description: My CRE workflow         # Human-readable description
-version: 1.0.0                       # Semantic version
-
-# Workflow settings
-settings:
-  timeout: 300000                    # Execution timeout in ms (max 5 min = 300000)
-  memory: 100                        # Memory limit in MB (max 100)
-  retries: 3                         # Retry count on failure
-
-# Triggers - what starts your workflow
-# Choose one or more trigger types
-triggers:
-  # HTTP Trigger - webhook/API endpoint
-  - type: http
-    http:
-      path: /webhook                 # Endpoint path
-      methods:                       # Allowed HTTP methods
-        - POST
-        - PUT
-      authentication:                # Auth configuration
-        type: bearer                 # Options: bearer, api-key, none
-        secret: WEBHOOK_SECRET       # Secret name for auth token
-
-  # Cron Trigger - scheduled execution
-  # - type: cron
-  #   cron:
-  #     schedule: "0 */5 * * * *"    # Every 5 minutes (min 30s interval)
-  #     timezone: UTC                # Timezone for schedule
-
-  # EVM Log Trigger - smart contract events
-  # - type: evm-log
-  #   evmLog:
-  #     chainId: 1                   # Chain ID (1=Ethereum, 137=Polygon, etc.)
-  #     address: "0x..."             # Contract address to monitor
-  #     topics:
-  #       - "0x..."                  # Event signature (topic0)
-  #     fromBlock: latest            # Starting block
-
-# Capabilities - external services your workflow uses
-capabilities:
-  - name: http-client                # HTTP requests to external APIs
-    config:
-      timeout: 30000                 # Request timeout in ms
-      maxRetries: 3                  # Retry count
-
-  - name: evm-client                 # Blockchain interactions
-    config:
-      chains:                        # Supported chains
-        - chainId: 1                 # Ethereum mainnet
-        - chainId: 137               # Polygon
-        - chainId: 42161             # Arbitrum
-
-# Build configuration
-build:
-  entryPoint: src/index.ts           # Main TypeScript file
-  outputDir: dist                    # Build output directory
-
-# Environment-specific overrides (optional)
-environments:
-  development:
-    settings:
-      timeout: 60000                 # Shorter timeout for dev
-    triggers:
-      - type: http
-        http:
-          path: /webhook-dev
-          methods: [POST]
-          authentication:
-            type: none               # No auth in dev
-
-  production:
-    settings:
-      timeout: 300000
-    triggers:
-      - type: http
-        http:
-          path: /webhook
-          methods: [POST]
-          authentication:
-            type: bearer
-            secret: WEBHOOK_SECRET_PROD
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "{{FOLDER_NAME}}-staging"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: ""
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "{{FOLDER_NAME}}-production"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: ""

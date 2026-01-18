@@ -10,184 +10,119 @@
  * - 5 HTTP calls per execution
  */
 
-import cre from "@aspect-build/aspect-workflows-cre-sdk";
-import { Runtime, HTTPClient, EVMClient } from "@aspect-build/aspect-workflows-cre-sdk";
+import { cre, type Runtime, Runner, getNetwork, bytesToHex, EVMLog } from "@chainlink/cre-sdk";
+import { keccak256, toHex, decodeEventLog, parseAbi } from "viem";
+import { configSchema, type Config } from "./types";
+
+/** ABI for the event CRE listens for. */
+const eventAbi = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"]);
+const eventSignature = "Transfer(address,address,uint256)";
+
+/*********************************
+ * Log Trigger Handler
+ *********************************/
 
 /**
- * Configuration type - matches config/config.json
+ * Handles Transfer events from the monitored contract.
+ * Implement your business logic here.
+ *
+ * @param runtime - CRE runtime instance with config and secrets
+ * @param log - EVM log containing the event
+ * @returns Success message string
  */
-interface Config {
-  sourceChainId: number;
-  targetChainId: number;
-  targetContractAddress: string;
-  notificationWebhook: string;
-}
+const onLogTrigger = (runtime: Runtime<Config>, log: EVMLog): string => {
+  try {
+    // ========================================
+    // Step 1: Decode Event Log
+    // ========================================
 
-/**
- * ERC20 Transfer event structure
- */
-interface TransferEvent {
-  from: string;
-  to: string;
-  value: bigint;
-}
+    // Convert topics/data to hex for viem decoding
+    const topics = log.topics.map(t => bytesToHex(t)) as [`0x${string}`, ...`0x${string}`[]];
+    const data = bytesToHex(log.data);
 
-/**
- * ABI for the target contract
- */
-const targetContractABI = [
-  {
-    name: "processTransfer",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "sourceChain", type: "uint256" },
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "txHash", type: "bytes32" },
-    ],
-    outputs: [{ name: "success", type: "bool" }],
-  },
-  {
-    name: "isProcessed",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "txHash", type: "bytes32" }],
-    outputs: [{ name: "", type: "bool" }],
-  },
-];
+    // Decode event fields using the ABI above
+    const decodedLog = decodeEventLog({ abi: eventAbi, data, topics });
+    runtime.log(`Event name: ${decodedLog.eventName}`);
 
-/**
- * Decode Transfer event from log data
- */
-function decodeTransferEvent(topics: string[], data: string): TransferEvent {
-  // Transfer(address indexed from, address indexed to, uint256 value)
-  // topics[0] = event signature
-  // topics[1] = from (indexed)
-  // topics[2] = to (indexed)
-  // data = value (non-indexed)
+    const from = decodedLog.args.from as string;
+    const to = decodedLog.args.to as string;
+    const value = decodedLog.args.value as bigint;
 
-  const from = "0x" + topics[1].slice(26); // Remove padding
-  const to = "0x" + topics[2].slice(26);
-  const value = BigInt(data);
+    runtime.log(`Transfer detected: ${from} -> ${to}, Amount: ${value.toString()}`);
 
-  return { from, to, value };
-}
+    // ========================================
+    // Step 2: Implement Your Business Logic
+    // ========================================
+    // Examples:
+    // - Query external API with httpClient
+    // - Write to another contract with evmClient
+    // - Store data in Firestore/database
+    // - Send notifications
 
-export default cre.handler(
-  async function (runtime: Runtime<Config>): Promise<void> {
-    const { trigger, config } = runtime;
+    // const result = callExternalApi(runtime, from, to, value);
+    // const txHash = executeOnChainAction(runtime, result);
+    // writeToDatabase(runtime, txHash);
 
-    // Validate trigger type
-    if (trigger.type !== "evm-log") {
-      throw new Error("This workflow only handles EVM log triggers");
-    }
-
-    const {
-      chainId,
-      address,
-      topics,
-      data,
-      blockNumber,
-      transactionHash,
-      logIndex,
-    } = trigger.evmLog;
-
-    console.log(`Processing event from block ${blockNumber}, tx: ${transactionHash}`);
-
-    // Get capabilities
-    const httpClient = runtime.getCapability<HTTPClient>("http-client");
-    const evmClient = runtime.getCapability<EVMClient>("evm-client");
-
-    try {
-      // Step 1: Decode the event
-      const transfer = decodeTransferEvent(topics, data);
-      console.log(`Transfer: ${transfer.from} -> ${transfer.to}, Amount: ${transfer.value}`);
-
-      // Step 2: Check if already processed (idempotency)
-      const txHashBytes = transactionHash as `0x${string}`;
-      const isProcessed = await evmClient.readContract<boolean>({
-        chainId: config.targetChainId,
-        address: config.targetContractAddress,
-        abi: targetContractABI,
-        functionName: "isProcessed",
-        args: [txHashBytes],
-      });
-
-      if (isProcessed) {
-        console.log("Transaction already processed, skipping");
-        return;
-      }
-
-      // Step 3: Validate the transfer (optional business logic)
-      const minAmount = BigInt("1000000000000000000"); // 1 token
-      if (transfer.value < minAmount) {
-        console.log(`Amount ${transfer.value} below minimum, skipping`);
-        return;
-      }
-
-      // Step 4: Execute cross-chain action
-      console.log("Executing cross-chain transfer processing...");
-
-      const txResult = await evmClient.writeContract({
-        chainId: config.targetChainId,
-        address: config.targetContractAddress,
-        abi: targetContractABI,
-        functionName: "processTransfer",
-        args: [
-          BigInt(config.sourceChainId),
-          transfer.from,
-          transfer.to,
-          transfer.value,
-          txHashBytes,
-        ],
-      });
-
-      console.log(`Cross-chain transaction submitted: ${txResult}`);
-
-      // Step 5: Send notification
-      if (config.notificationWebhook) {
-        await httpClient.fetch(config.notificationWebhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            event: "transfer_processed",
-            sourceChain: config.sourceChainId,
-            targetChain: config.targetChainId,
-            sourceTx: transactionHash,
-            targetTx: txResult,
-            from: transfer.from,
-            to: transfer.to,
-            amount: transfer.value.toString(),
-            blockNumber: blockNumber,
-            timestamp: new Date().toISOString(),
-          }),
-        });
-        console.log("Notification sent");
-      }
-
-      console.log("EVM log workflow completed successfully");
-    } catch (error) {
-      console.error("EVM log workflow failed:", error);
-
-      // Send error notification
-      try {
-        await httpClient.fetch(config.notificationWebhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            event: "transfer_failed",
-            error: error instanceof Error ? error.message : "Unknown error",
-            sourceTx: transactionHash,
-            blockNumber: blockNumber,
-          }),
-        });
-      } catch {
-        console.error("Failed to send error notification");
-      }
-
-      throw error;
-    }
+    return "Event Processed Successfully";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    runtime.log(`onLogTrigger error: ${msg}`);
+    throw err;
   }
-);
+};
+
+/*********************************
+ * Workflow Initialization
+ *********************************/
+
+/**
+ * Initializes the CRE workflow by setting up the EVM log trigger.
+ * Configures the workflow to listen for events from the specified contract.
+ *
+ * @param config - Validated workflow configuration
+ * @returns Array of CRE handlers
+ */
+const initWorkflow = (config: Config) => {
+  // Fetch the chain network to listen for logs on
+  const network = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName: config.chainSelectorName,
+    isTestnet: true,
+  });
+
+  if (!network) {
+    throw new Error(`Network not found for chain selector name: ${config.chainSelectorName}`);
+  }
+
+  const evmClient = new cre.capabilities.EVMClient(network.chainSelector.selector);
+
+  // Compute the event topic hash for the event that we wish to monitor
+  const eventTopicHash = keccak256(toHex(eventSignature));
+
+  // Trigger CRE only on emit of specified logs from the contract
+  return [
+    cre.handler(
+      evmClient.logTrigger({
+        addresses: [config.contractAddress],
+        topics: [{ values: [eventTopicHash] }],
+        confidence: "CONFIDENCE_LEVEL_FINALIZED",
+      }),
+      onLogTrigger
+    ),
+  ];
+};
+
+/*********************************
+ * Entry Point
+ *********************************/
+
+/**
+ * Main entry point for the CRE workflow.
+ * Initializes the CRE runner and starts the workflow.
+ */
+export async function main() {
+  const runner = await Runner.newRunner<Config>({ configSchema });
+  await runner.run(initWorkflow);
+}
+
+main();

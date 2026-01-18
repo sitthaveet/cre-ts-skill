@@ -49,13 +49,10 @@ After installation, restart Claude Code or run `/skills reload` to load the skil
 
 ### 2. Create a New Workflow
 
-Copy a template to get started:
+Initialize a new CRE project:
 
 ```bash
-# HTTP webhook workflow
-cp templates/workflow-http.ts my-workflow/src/index.ts
-cp templates/workflow.yaml.template my-workflow/workflow.yaml
-cp templates/config.json.template my-workflow/config/config.json
+cre init
 ```
 
 ### 3. Validate Your Workflow

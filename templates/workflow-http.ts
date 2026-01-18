@@ -10,104 +10,97 @@
  * - 5 minute timeout
  */
 
-import cre from "@aspect-build/aspect-workflows-cre-sdk";
-import { Runtime, HTTPClient } from "@aspect-build/aspect-workflows-cre-sdk";
+import { cre, type Runtime, Runner, type HTTPRequest } from "@chainlink/cre-sdk";
+import { configSchema, type Config } from "./types";
+
+/*********************************
+ * HTTP Trigger Handler
+ *********************************/
 
 /**
- * Configuration type - matches config/config.json
+ * Handles incoming HTTP requests.
+ * Implement your business logic here.
+ *
+ * @param runtime - CRE runtime instance with config and secrets
+ * @param request - HTTP request containing method, path, headers, body
+ * @returns Response string
  */
-interface Config {
-  apiUrl: string;
-  maxRetries: number;
-}
+const onHttpTrigger = (runtime: Runtime<Config>, request: HTTPRequest): string => {
+  try {
+    // ========================================
+    // Step 1: Parse Request
+    // ========================================
 
-/**
- * Expected request body structure
- */
-interface RequestBody {
-  action: string;
-  data: Record<string, unknown>;
-}
+    runtime.log(`Received ${request.method} request to ${request.path}`);
 
-/**
- * Response structure
- */
-interface ApiResponse {
-  success: boolean;
-  result?: unknown;
-  error?: string;
-}
+    // Parse request body if present
+    const body = request.body ? JSON.parse(request.body) : {};
+    runtime.log(`Request body: ${JSON.stringify(body)}`);
 
-export default cre.handler(
-  async function (runtime: Runtime<Config>): Promise<void> {
-    const { trigger, config } = runtime;
+    // ========================================
+    // Step 2: Implement Your Business Logic
+    // ========================================
+    // Examples:
+    // - Validate request data
+    // - Query external API with httpClient
+    // - Read/write blockchain data with evmClient
+    // - Process and transform data
 
-    // Validate trigger type
-    if (trigger.type !== "http") {
-      throw new Error("This workflow only handles HTTP triggers");
-    }
+    // const apiResult = callExternalApi(runtime, body);
+    // const txHash = executeOnChainAction(runtime, apiResult);
 
-    const { method, path, headers, body } = trigger.http;
-    console.log(`Received ${method} request to ${path}`);
+    // ========================================
+    // Step 3: Return Response
+    // ========================================
 
-    // Parse and validate request body
-    const requestBody = body as RequestBody;
-    if (!requestBody?.action) {
-      runtime.emit({
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          success: false,
-          error: "Missing required field: action",
-        } as ApiResponse),
-      });
-      return;
-    }
+    const response = {
+      success: true,
+      message: "Request processed successfully",
+      data: body,
+    };
 
-    try {
-      // Get HTTP client capability
-      const httpClient = runtime.getCapability<HTTPClient>("http-client");
-
-      // Get API key from secrets (if needed)
-      const apiKey = await runtime.getSecret("API_KEY");
-
-      // Make API call
-      const response = await httpClient.fetch<ApiResponse>(
-        `${config.apiUrl}/process`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            action: requestBody.action,
-            data: requestBody.data,
-          }),
-          timeout: 30000,
-        }
-      );
-
-      // Return success response
-      runtime.emit({
-        statusCode: 200,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          success: true,
-          result: response,
-        } as ApiResponse),
-      });
-    } catch (error) {
-      console.error("Workflow failed:", error);
-
-      runtime.emit({
-        statusCode: 500,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        } as ApiResponse),
-      });
-    }
+    return JSON.stringify(response);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    runtime.log(`onHttpTrigger error: ${msg}`);
+    throw err;
   }
-);
+};
+
+/*********************************
+ * Workflow Initialization
+ *********************************/
+
+/**
+ * Initializes the CRE workflow by setting up the HTTP trigger.
+ *
+ * @param config - Validated workflow configuration
+ * @returns Array of CRE handlers
+ */
+const initWorkflow = (config: Config) => {
+  // Set up HTTP trigger
+  return [
+    cre.handler(
+      cre.triggers.http({
+        path: config.webhookPath || "/webhook",
+        methods: ["POST"],
+      }),
+      onHttpTrigger
+    ),
+  ];
+};
+
+/*********************************
+ * Entry Point
+ *********************************/
+
+/**
+ * Main entry point for the CRE workflow.
+ * Initializes the CRE runner and starts the workflow.
+ */
+export async function main() {
+  const runner = await Runner.newRunner<Config>({ configSchema });
+  await runner.run(initWorkflow);
+}
+
+main();

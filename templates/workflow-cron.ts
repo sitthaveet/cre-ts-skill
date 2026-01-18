@@ -10,123 +10,90 @@
  * - 5 HTTP calls per execution
  */
 
-import cre from "@aspect-build/aspect-workflows-cre-sdk";
-import { Runtime, HTTPClient, EVMClient } from "@aspect-build/aspect-workflows-cre-sdk";
+import { cre, type Runtime, Runner, type CronTrigger } from "@chainlink/cre-sdk";
+import { configSchema, type Config } from "./types";
+
+/*********************************
+ * Cron Trigger Handler
+ *********************************/
 
 /**
- * Configuration type - matches config/config.json
+ * Handles scheduled cron triggers.
+ * Implement your business logic here.
+ *
+ * @param runtime - CRE runtime instance with config and secrets
+ * @param trigger - Cron trigger containing scheduled and actual time
+ * @returns Success message string
  */
-interface Config {
-  apiEndpoint: string;
-  chainId: number;
-  contractAddress: string;
-  alertThreshold: number;
-}
+const onCronTrigger = (runtime: Runtime<Config>, trigger: CronTrigger): string => {
+  try {
+    // ========================================
+    // Step 1: Log Trigger Info
+    // ========================================
 
-/**
- * Data structure for monitoring
- */
-interface MetricData {
-  timestamp: string;
-  value: number;
-  source: string;
-}
+    runtime.log(`Cron triggered - Scheduled: ${trigger.scheduledTime}, Actual: ${trigger.actualTime}`);
 
-export default cre.handler(
-  async function (runtime: Runtime<Config>): Promise<void> {
-    const { trigger, config } = runtime;
+    // ========================================
+    // Step 2: Implement Your Business Logic
+    // ========================================
+    // Examples:
+    // - Fetch external data with httpClient
+    // - Read on-chain data with evmClient
+    // - Compare and process data
+    // - Send alerts or notifications
+    // - Update databases
 
-    // Validate trigger type
-    if (trigger.type !== "cron") {
-      throw new Error("This workflow only handles cron triggers");
-    }
+    // const externalData = fetchExternalData(runtime);
+    // const onChainData = readOnChainData(runtime);
+    // const result = processData(externalData, onChainData);
+    // sendNotification(runtime, result);
 
-    const { scheduledTime, actualTime } = trigger.cron;
-    console.log(`Cron triggered - Scheduled: ${scheduledTime}, Actual: ${actualTime}`);
+    // ========================================
+    // Step 3: Return Result
+    // ========================================
 
-    // Get capabilities
-    const httpClient = runtime.getCapability<HTTPClient>("http-client");
-    const evmClient = runtime.getCapability<EVMClient>("evm-client");
-
-    try {
-      // Step 1: Fetch external data
-      console.log("Fetching external metrics...");
-      const apiKey = await runtime.getSecret("METRICS_API_KEY");
-
-      const externalMetrics = await httpClient.fetch<MetricData>(
-        `${config.apiEndpoint}/metrics/latest`,
-        {
-          headers: { Authorization: `Bearer ${apiKey}` },
-        }
-      );
-
-      // Step 2: Read on-chain data
-      console.log("Reading on-chain data...");
-      const onChainValue = await evmClient.readContract<bigint>({
-        chainId: config.chainId,
-        address: config.contractAddress,
-        abi: [
-          {
-            name: "getValue",
-            type: "function",
-            stateMutability: "view",
-            inputs: [],
-            outputs: [{ name: "", type: "uint256" }],
-          },
-        ],
-        functionName: "getValue",
-      });
-
-      // Step 3: Process and compare
-      const onChainNumber = Number(onChainValue);
-      const externalValue = externalMetrics.value;
-      const difference = Math.abs(onChainNumber - externalValue);
-
-      console.log(`On-chain: ${onChainNumber}, External: ${externalValue}, Diff: ${difference}`);
-
-      // Step 4: Alert if threshold exceeded
-      if (difference > config.alertThreshold) {
-        console.warn(`Alert: Difference ${difference} exceeds threshold ${config.alertThreshold}`);
-
-        // Send alert notification
-        const webhookUrl = await runtime.getSecret("ALERT_WEBHOOK_URL");
-        await httpClient.fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            alert: "Value discrepancy detected",
-            onChainValue: onChainNumber,
-            externalValue: externalValue,
-            difference: difference,
-            threshold: config.alertThreshold,
-            timestamp: actualTime,
-          }),
-        });
-
-        console.log("Alert sent successfully");
-      } else {
-        console.log("Values within acceptable range");
-      }
-
-      // Step 5: Log completion (optional: store results)
-      await httpClient.fetch(`${config.apiEndpoint}/metrics/log`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          timestamp: actualTime,
-          onChainValue: onChainNumber,
-          externalValue: externalValue,
-          status: difference > config.alertThreshold ? "alert" : "ok",
-        }),
-      });
-
-      console.log("Cron job completed successfully");
-    } catch (error) {
-      console.error("Cron job failed:", error);
-      throw error; // Re-throw to mark execution as failed
-    }
+    return "Cron Job Completed Successfully";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    runtime.log(`onCronTrigger error: ${msg}`);
+    throw err;
   }
-);
+};
+
+/*********************************
+ * Workflow Initialization
+ *********************************/
+
+/**
+ * Initializes the CRE workflow by setting up the cron trigger.
+ *
+ * @param config - Validated workflow configuration
+ * @returns Array of CRE handlers
+ */
+const initWorkflow = (config: Config) => {
+  // Set up cron trigger (minimum 30 second interval)
+  return [
+    cre.handler(
+      cre.triggers.cron({
+        schedule: config.cronSchedule || "0 */5 * * * *", // Every 5 minutes
+        timezone: config.timezone || "UTC",
+      }),
+      onCronTrigger
+    ),
+  ];
+};
+
+/*********************************
+ * Entry Point
+ *********************************/
+
+/**
+ * Main entry point for the CRE workflow.
+ * Initializes the CRE runner and starts the workflow.
+ */
+export async function main() {
+  const runner = await Runner.newRunner<Config>({ configSchema });
+  await runner.run(initWorkflow);
+}
+
+main();

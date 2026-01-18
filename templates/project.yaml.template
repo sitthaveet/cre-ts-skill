@@ -1,0 +1,47 @@
+# ==========================================================================
+# CRE Project Settings Template
+# ==========================================================================
+# Project-level settings for CRE CLI targets.
+# Each target defines cre-cli, account, and rpcs groups.
+#
+# Docs: https://docs.chain.link/cre/guides/workflow/secrets/using-secrets-simulation-ts
+# ==========================================================================
+
+# ==========================================================================
+# Local Simulation Target
+# ==========================================================================
+# Use this target for local development and testing.
+# Run: cre simulate --target staging-settings
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://0xrpc.io/sep
+
+# ==========================================================================
+# Staging Target
+# ==========================================================================
+# Use this target for staging/testnet deployments.
+# Run: cre deploy --target staging
+production-staging:
+  cre-cli:
+    don-family: "zone-a"                    # Required: Workflow DON Family
+  account:
+    workflow-owner-address: ""              # Optional: Multi-sig address (for --unsigned)
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://0xrpc.io/sep
+
+# ==========================================================================
+# Production Target (Example)
+# ==========================================================================
+# Uncomment and configure for production deployments.
+# Run: cre deploy --target production
+#
+# production:
+#   cre-cli:
+#     don-family: "zone-a"
+#   account:
+#     workflow-owner-address: "0x..."       # Your production multi-sig address
+#   rpcs:
+#     - chain-name: ethereum-mainnet
+#       url: https://your-mainnet-rpc-url

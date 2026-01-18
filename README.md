@@ -5,11 +5,13 @@ A Claude Code Skill that makes Claude an expert in Chainlink Runtime Environment
 ## Overview
 
 This skill provides Claude with knowledge about CRE, including:
+
 - TypeScript SDK for building workflows
 - CLI commands for development and deployment
 - Trigger types (HTTP, Cron, EVM Log)
 - Capabilities (HTTPClient, EVMClient)
 - Secrets management and limits
+- Get chain selector name and id that provided by Chainlink
 
 ## Installation
 
@@ -79,13 +81,18 @@ cre-ts-skill/
 │   ├── check-cre-cli.sh         # Verify CRE CLI installation
 │   ├── validate-workflow.sh     # Validate workflow structure
 │   ├── simulate-workflow.sh     # Run simulation wrapper
-│   └── analyze-limits.sh        # Check for limit violations
+│   ├── analyze-limits.sh        # Check for limit violations
+│   └── get-chain-selector.sh    # Get chain selector name and id
 ├── templates/
-│   ├── workflow-http.ts         # HTTP trigger template
+│   ├── workflow-get-request.ts  # HTTP GET request template
+│   ├── workflow-post-request.ts # HTTP POST request template
 │   ├── workflow-cron.ts         # Cron trigger template
 │   ├── workflow-evm-log.ts      # EVM log trigger template
 │   ├── workflow.yaml.template   # Workflow metadata template
-│   └── config.json.template     # Target config template
+│   ├── config.json.template     # Target configuration template
+│   ├── project.yaml.template    # Project-level CLI targets
+│   ├── secrets.yaml.template    # Secrets declaration template
+│   └── .env.template            # Environment variables template
 └── .claude/
     └── settings.local.json      # Claude Code permissions
 ```
@@ -94,34 +101,39 @@ cre-ts-skill/
 
 All scripts output JSON for easy parsing.
 
-| Script | Purpose |
-|--------|---------|
-| `fetch-docs.sh` | Download full CRE docs to `/tmp/cre-docs-full.txt` |
-| `check-cre-cli.sh` | Check if CRE CLI is installed and show version |
-| `validate-workflow.sh` | Validate workflow directory structure |
-| `simulate-workflow.sh` | Run `cre workflow simulate` with helpful output |
-| `analyze-limits.sh` | Static analysis for potential limit issues |
+| Script                  | Purpose                                                   |
+| ----------------------- | --------------------------------------------------------- |
+| `fetch-docs.sh`         | Download full CRE docs to `/tmp/cre-docs-full.txt`        |
+| `check-cre-cli.sh`      | Check if CRE CLI is installed and show version            |
+| `validate-workflow.sh`  | Validate workflow directory structure                     |
+| `simulate-workflow.sh`  | Run `cre workflow simulate` with helpful output           |
+| `analyze-limits.sh`     | Static analysis for potential limit issues                |
+| `get-chain-selector.sh` | Get chain selector name and id that provided by Chainlink |
 
 ## Templates
 
-| Template | Use Case |
-|----------|----------|
-| `workflow-http.ts` | Webhook handlers, REST APIs |
-| `workflow-cron.ts` | Scheduled jobs (min 30s interval) |
-| `workflow-evm-log.ts` | React to smart contract events |
-| `workflow.yaml.template` | Workflow configuration |
-| `config.json.template` | Runtime configuration |
+| Template                   | Use Case                              |
+| -------------------------- | ------------------------------------- |
+| `workflow-get-request.ts`  | HTTP GET request example              |
+| `workflow-post-request.ts` | HTTP POST request example             |
+| `workflow-cron.ts`         | Scheduled jobs (min 30s interval)     |
+| `workflow-evm-log.ts`      | React to smart contract events        |
+| `workflow.yaml.template`   | Workflow metadata configuration       |
+| `config.json.template`     | Target configuration                  |
+| `project.yaml.template`    | Project-level CLI targets (RPCs, DON) |
+| `secrets.yaml.template`    | Secrets declaration                   |
+| `.env.template`            | Environment variables for simulation  |
 
 ## CRE Limits (Quick Reference)
 
-| Resource | Limit |
-|----------|-------|
-| Execution timeout | 5 minutes |
-| Memory | 100 MB |
-| HTTP calls/execution | 5 |
-| EVM reads/execution | 10 |
-| Response size | 100 KB |
-| Cron min interval | 30 seconds |
+| Resource             | Limit      |
+| -------------------- | ---------- |
+| Execution timeout    | 5 minutes  |
+| Memory               | 100 MB     |
+| HTTP calls/execution | 5          |
+| EVM reads/execution  | 10         |
+| Response size        | 100 KB     |
+| Cron min interval    | 30 seconds |
 
 ## Documentation
 
@@ -133,7 +145,7 @@ This approach ensures Claude always has access to up-to-date information without
 
 ## Requirements
 
-- Node.js >= 18.0.0
+- Bun >= 1.2.21 (install from https://bun.sh)
 - CRE CLI (install from https://docs.chain.link/cre)
 - `jq` (for script JSON processing)
 

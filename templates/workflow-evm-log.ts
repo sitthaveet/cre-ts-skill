@@ -10,12 +10,28 @@
  * - 5 HTTP calls per execution
  */
 
-import { cre, type Runtime, Runner, getNetwork, bytesToHex, EVMLog } from "@chainlink/cre-sdk";
+import {
+  cre,
+  type Runtime,
+  Runner,
+  getNetwork,
+  bytesToHex,
+  EVMLog,
+} from "@chainlink/cre-sdk";
 import { keccak256, toHex, decodeEventLog, parseAbi } from "viem";
-import { configSchema, type Config } from "./types";
+import { z } from "zod";
+
+const configSchema = z.object({
+  chainSelectorName: z.string(),
+  contractAddress: z.string(),
+});
+
+type Config = z.infer<typeof configSchema>;
 
 /** ABI for the event CRE listens for. */
-const eventAbi = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"]);
+const eventAbi = parseAbi([
+  "event Transfer(address indexed from, address indexed to, uint256 value)",
+]);
 const eventSignature = "Transfer(address,address,uint256)";
 
 /*********************************
@@ -37,7 +53,10 @@ const onLogTrigger = (runtime: Runtime<Config>, log: EVMLog): string => {
     // ========================================
 
     // Convert topics/data to hex for viem decoding
-    const topics = log.topics.map(t => bytesToHex(t)) as [`0x${string}`, ...`0x${string}`[]];
+    const topics = log.topics.map((t) => bytesToHex(t)) as [
+      `0x${string}`,
+      ...`0x${string}`[],
+    ];
     const data = bytesToHex(log.data);
 
     // Decode event fields using the ABI above
@@ -48,7 +67,9 @@ const onLogTrigger = (runtime: Runtime<Config>, log: EVMLog): string => {
     const to = decodedLog.args.to as string;
     const value = decodedLog.args.value as bigint;
 
-    runtime.log(`Transfer detected: ${from} -> ${to}, Amount: ${value.toString()}`);
+    runtime.log(
+      `Transfer detected: ${from} -> ${to}, Amount: ${value.toString()}`,
+    );
 
     // ========================================
     // Step 2: Implement Your Business Logic
@@ -91,10 +112,14 @@ const initWorkflow = (config: Config) => {
   });
 
   if (!network) {
-    throw new Error(`Network not found for chain selector name: ${config.chainSelectorName}`);
+    throw new Error(
+      `Network not found for chain selector name: ${config.chainSelectorName}`,
+    );
   }
 
-  const evmClient = new cre.capabilities.EVMClient(network.chainSelector.selector);
+  const evmClient = new cre.capabilities.EVMClient(
+    network.chainSelector.selector,
+  );
 
   // Compute the event topic hash for the event that we wish to monitor
   const eventTopicHash = keccak256(toHex(eventSignature));
@@ -107,7 +132,7 @@ const initWorkflow = (config: Config) => {
         topics: [{ values: [eventTopicHash] }],
         confidence: "CONFIDENCE_LEVEL_FINALIZED",
       }),
-      onLogTrigger
+      onLogTrigger,
     ),
   ];
 };

@@ -10,8 +10,20 @@
  * - 5 HTTP calls per execution
  */
 
-import { cre, type Runtime, Runner, type CronTrigger } from "@chainlink/cre-sdk";
-import { configSchema, type Config } from "./types";
+import {
+  cre,
+  type Runtime,
+  Runner,
+  type CronTrigger,
+} from "@chainlink/cre-sdk";
+import { z } from "zod";
+
+const configSchema = z.object({
+  schedule: z.string().default("0 */5 * * * *"), // Every 5 minutes
+  timezone: z.string().optional().default("UTC"),
+});
+
+type Config = z.infer<typeof configSchema>;
 
 /*********************************
  * Cron Trigger Handler
@@ -25,13 +37,18 @@ import { configSchema, type Config } from "./types";
  * @param trigger - Cron trigger containing scheduled and actual time
  * @returns Success message string
  */
-const onCronTrigger = (runtime: Runtime<Config>, trigger: CronTrigger): string => {
+const onCronTrigger = (
+  runtime: Runtime<Config>,
+  trigger: CronTrigger,
+): string => {
   try {
     // ========================================
     // Step 1: Log Trigger Info
     // ========================================
 
-    runtime.log(`Cron triggered - Scheduled: ${trigger.scheduledTime}, Actual: ${trigger.actualTime}`);
+    runtime.log(
+      `Cron triggered - Scheduled: ${trigger.scheduledTime}, Actual: ${trigger.actualTime}`,
+    );
 
     // ========================================
     // Step 2: Implement Your Business Logic
@@ -74,11 +91,11 @@ const initWorkflow = (config: Config) => {
   // Set up cron trigger (minimum 30 second interval)
   return [
     cre.handler(
-      cre.triggers.cron({
-        schedule: config.cronSchedule || "0 */5 * * * *", // Every 5 minutes
-        timezone: config.timezone || "UTC",
+      new cre.capabilities.CronCapability().trigger({
+        schedule: config.schedule,
+        timezone: config.timezone,
       }),
-      onCronTrigger
+      onCronTrigger,
     ),
   ];
 };

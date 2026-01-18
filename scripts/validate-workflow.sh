@@ -22,8 +22,12 @@ validate_workflow() {
         found_files+=("src/index.ts")
     elif [[ -f "$WORKFLOW_PATH/index.ts" ]]; then
         found_files+=("index.ts")
+    elif [[ -f "$WORKFLOW_PATH/src/main.ts" ]]; then
+        found_files+=("src/main.ts")
+    elif [[ -f "$WORKFLOW_PATH/main.ts" ]]; then
+        found_files+=("main.ts")
     else
-        errors+=("Missing TypeScript entry point (src/index.ts or index.ts)")
+        errors+=("Missing TypeScript entry point (src/index.ts, src/main.ts, index.ts or main.ts)")
     fi
 
     # Check for package.json

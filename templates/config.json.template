@@ -1,3 +1,6 @@
+# ==========================================================================
+# CRE Config Template Example
+# ==========================================================================
 {
   "geminiModel": "gemini-3.0-flash",
   "evms": [
@@ -6,5 +9,7 @@
       "chainSelectorName": "ethereum-testnet-sepolia",
       "gasLimit": "1000000"
     }
-  ]
+  ],
+  "schedule": "*/30 * * * * *",
+  "apiUrl": "https://api.example.com/v1/data"
 }

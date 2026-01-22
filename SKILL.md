@@ -1,6 +1,6 @@
 ---
 name: cre-typescript
-description: Build Chainlink Runtime Environment (CRE) workflows in TypeScript - triggers, SDK, CLI, secrets, limits
+description: Build Chainlink Runtime Environment (CRE) workflows in TypeScript - triggers, SDK, CLI, secrets
 ---
 
 # CRE TypeScript Skill
@@ -27,7 +27,7 @@ curl -fsSL https://bun.sh/install | bash
 
 ```bash
 # If user wants to start a new project, always use
-cre init
+cre init --project-name my-cre-project --workflow-name my-workflow --template-id 3
 
 # Check CRE CLI installation
 ./scripts/check-cre-cli.sh
@@ -35,11 +35,8 @@ cre init
 # Validate workflow structure
 ./scripts/validate-workflow.sh <workflow-path>
 
-# Simulate workflow locally
+# If user wants to run the workflow (simulate locally)
 ./scripts/simulate-workflow.sh <workflow-path>
-
-# Analyze for limit violations
-./scripts/analyze-limits.sh <workflow-path>
 
 # Get list of chain selectors (names and IDs)
 ./scripts/get-chain-selector.sh
@@ -47,6 +44,8 @@ cre init
 # Fetch full official docs (when unsure about details)
 ./scripts/fetch-docs.sh
 ```
+
+PS. workflow-path is a workflow-name or the folder that contains workflow.
 
 ## Core Concepts
 
@@ -195,17 +194,6 @@ myProject/
 └── …
 ```
 
-## Critical Limits
-
-| Resource             | Limit      |
-| -------------------- | ---------- |
-| Execution timeout    | 5 minutes  |
-| Memory               | 100 MB     |
-| HTTP calls/execution | 5          |
-| EVM reads/execution  | 10         |
-| Response size        | 100 KB     |
-| Cron min interval    | 30 seconds |
-
 ## Workflow Templates
 
 | Template                           | Use Case                              |
@@ -282,14 +270,6 @@ export async function main() {
 main()
 ```
 
-### Secrets Limits
-
-| Resource                        | Limit |
-| ------------------------------- | ----- |
-| Total secrets size per workflow | 1 MB  |
-| Concurrent secret fetches       | 5     |
-| Secrets per account             | 100   |
-
 ## Quick reference: Common pitfalls in non-determinism 
 
 | Don't Use                    | Use Instead                                  |
@@ -302,8 +282,7 @@ main()
 **Docs**: https://docs.chain.link/cre/guides/workflow/secrets/using-secrets-simulation-ts
 
 ## Getting Detailed Documentation
-
-**When you need more details** (CLI options, SDK types, trigger configs, capability methods, etc.), run:
+**Important**: If you're not sure or need more details** (CLI options, SDK types, trigger configs, capability methods, etc.), run:
 
 ```bash
 ./scripts/fetch-docs.sh

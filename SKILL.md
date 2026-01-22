@@ -18,6 +18,7 @@ bun --version  # Must be >= 1.2.21
 ```
 
 If Bun is not installed or version is too old:
+
 ```bash
 # Install Bun (macOS/Linux)
 curl -fsSL https://bun.sh/install | bash
@@ -57,6 +58,10 @@ PS. workflow-path is a workflow-name or the folder that contains workflow.
 | **Handler**    | The main entry point using `cre.handler()`            |
 | **Secrets**    | Secure credentials accessed via `runtime.getSecret()` |
 
+## Avoid using secrets for local simulation
+
+Even though CRE provides how to use secrets during local development and simulation, the secrets can be very buggy. If you're stuck with "secret not found". You can use config.json to hold the secret value instead.
+
 ## Basic Workflow Structure
 
 ```typescript
@@ -67,40 +72,43 @@ import {
   type Runtime,
   type HTTPSendRequester,
   Runner,
-} from "@chainlink/cre-sdk"
-import { z } from "zod"
+} from "@chainlink/cre-sdk";
+import { z } from "zod";
 
 // Config schema
 const configSchema = z.object({
   webhookUrl: z.string(),
   schedule: z.string(),
-})
+});
 
-type Config = z.infer<typeof configSchema>
+type Config = z.infer<typeof configSchema>;
 
 // Data to be sent
 type MyData = {
-  message: string
-  value: number
-}
+  message: string;
+  value: number;
+};
 
 // Response for consensus
 type PostResponse = {
-  statusCode: number
-}
+  statusCode: number;
+};
 
-const postData = (sendRequester: HTTPSendRequester, config: Config): PostResponse => {
+const postData = (
+  sendRequester: HTTPSendRequester,
+  config: Config,
+): PostResponse => {
   // 1. Prepare the data to be sent
   const dataToSend: MyData = {
     message: "Hello there!",
     value: 77,
-  }
+  };
 
   // 2. Serialize the data to JSON and encode as bytes
-  const bodyBytes = new TextEncoder().encode(JSON.stringify(dataToSend))
+  const bodyBytes = new TextEncoder().encode(JSON.stringify(dataToSend));
 
   // 3. Convert to base64 for the request
-  const body = Buffer.from(bodyBytes).toString("base64")
+  const body = Buffer.from(bodyBytes).toString("base64");
 
   // 4. Construct the POST request with cacheSettings
   const req = {
@@ -111,35 +119,37 @@ const postData = (sendRequester: HTTPSendRequester, config: Config): PostRespons
       "Content-Type": "application/json",
     },
     cacheSettings: {
-      readFromCache: true, // Enable reading from cache
-      maxAgeMs: 60000, // Accept cached responses up to 60 seconds old
+      store: true, // IMPORTANT: Use 'store', not 'readFromCache'
+      maxAge: { seconds: 60n }, // IMPORTANT: Use 'maxAge' (Duration type), not 'maxAgeMs'
     },
-  }
+  };
 
   // 5. Send the request and wait for the response
-  const resp = sendRequester.sendRequest(req).result()
+  const resp = sendRequester.sendRequest(req).result();
 
   if (!ok(resp)) {
-    throw new Error(`HTTP request failed with status: ${resp.statusCode}`)
+    throw new Error(`HTTP request failed with status: ${resp.statusCode}`);
   }
 
-  return { statusCode: resp.statusCode }
-}
+  return { statusCode: resp.statusCode };
+};
 
 const onCronTrigger = (runtime: Runtime<Config>): string => {
-  const httpClient = new cre.capabilities.HTTPClient()
+  const httpClient = new cre.capabilities.HTTPClient();
 
   const result = httpClient
     .sendRequest(
       runtime,
       postData,
-      consensusIdenticalAggregation<PostResponse>()
-    )(runtime.config) // Call with config
-    .result()
+      consensusIdenticalAggregation<PostResponse>(),
+    )(runtime.config) // IMPORTANT: sendRequest() returns a function that must be called with (config)
+    .result();
 
-  runtime.log(`Successfully sent data to webhook. Status: ${result.statusCode}`)
-  return "Success"
-}
+  runtime.log(
+    `Successfully sent data to webhook. Status: ${result.statusCode}`,
+  );
+  return "Success";
+};
 
 const initWorkflow = (config: Config) => {
   return [
@@ -147,23 +157,25 @@ const initWorkflow = (config: Config) => {
       new cre.capabilities.CronCapability().trigger({
         schedule: config.schedule,
       }),
-      onCronTrigger
+      onCronTrigger,
     ),
-  ]
-}
+  ];
+};
 
 export async function main() {
   const runner = await Runner.newRunner<Config>({
     configSchema,
-  })
-  await runner.run(initWorkflow)
+  });
+  await runner.run(initWorkflow);
 }
 
-main()
+main();
 ```
 
 ## Project structure
+
 A typical CRE TypeScript project is organized as follows:
+
 ```text
 myProject/
 ├── .env                    # Secret values (never commit to a Version Control System like Git)
@@ -196,20 +208,48 @@ myProject/
 
 ## Workflow Templates
 
-| Template                           | Use Case                              |
-| ---------------------------------- | ------------------------------------- |
-| `templates/workflow-http.ts`       | HTTP webhook handlers                 |
-| `templates/workflow-cron.ts`       | Scheduled jobs (min 30s)              |
-| `templates/workflow-evm-log.ts`    | Smart contract event listeners        |
-| `templates/workflow.yaml.template` | Workflow metadata                     |
-| `templates/config.json.template`   | Target configuration                  |
-| `templates/project.yaml.template`  | Project-level CLI targets (RPCs, DON) |
-| `templates/secrets.yaml.template`  | Secrets declaration                   |
-| `templates/.env.template`          | Environment variables for simulation  |
+| Template                             | Use Case                              |
+| ------------------------------------ | ------------------------------------- |
+| `templates/workflow-get-request.ts`  | HTTP GET request handlers             |
+| `templates/workflow-post-request.ts` | HTTP POST request handlers            |
+| `templates/workflow-cron.ts`         | Scheduled jobs (min 30s)              |
+| `templates/workflow-evm-log.ts`      | Smart contract event listeners        |
+| `templates/workflow-using-secret.ts` | Workflow using secrets example        |
+| `templates/workflow.yaml.template`   | Workflow metadata                     |
+| `templates/config.json.template`     | Target configuration                  |
+| `templates/project.yaml.template`    | Project-level CLI targets (RPCs, DON) |
+| `templates/secrets.yaml.template`    | Secrets declaration                   |
+| `templates/.env.template`            | Environment variables for simulation  |
 
 ## Secrets Management
 
 Secrets (API keys, credentials) are declared in `secrets.yaml` and accessed via `runtime.getSecret()`.
+
+## Secrets Troubleshooting
+
+### Common Issue: "secret not found" in simulation
+
+If you encounter `error fetching [object Object]: secret not found` during local simulation:
+
+1. **Workaround for development**: Pass sensitive values via `config.json` temporarily.
+2. **For production with secrets**: Use the `runInNodeMode` pattern which provides `NodeRuntime` with more robust secrets access.
+
+### Alternative Pattern (runInNodeMode with secrets)
+
+```typescript
+const postWithSecret = (nodeRuntime: NodeRuntime<Config>): Response => {
+  const secret = nodeRuntime.getSecret({ id: "API_KEY" }).result();
+  const apiKey = secret.value;
+  // ... use apiKey
+};
+
+const onTrigger = (runtime: Runtime<Config>): string => {
+  const result = runtime
+    .runInNodeMode(postWithSecret, consensusIdenticalAggregation<Response>())()
+    .result();
+  return result;
+};
+```
 
 ### Step 1: Define Secrets in secrets.yaml
 
@@ -232,45 +272,47 @@ DATABASE_URL_VAR=postgres://user:pass@localhost:5432/db
 ### Step 3: Access Secrets in Workflow Code
 
 ```typescript
-import { cre, Runner, type Runtime } from "@chainlink/cre-sdk"
+import { cre, Runner, type Runtime } from "@chainlink/cre-sdk";
 
 // Config can be an empty object if you don't need any parameters from config.json
-type Config = Record<string, never>
+type Config = Record<string, never>;
 
 // Define the logical name of the secret as a constant for clarity
-const SECRET_NAME = "SECRET_ADDRESS"
+const SECRET_NAME = "SECRET_ADDRESS";
 
 // onCronTrigger is the callback function that gets executed when the cron trigger fires
 // This is where you use the secret
 const onCronTrigger = (runtime: Runtime<Config>): string => {
   // Call runtime.getSecret with the secret's logical ID
-  const secret = runtime.getSecret({ id: SECRET_NAME }).result()
+  const secret = runtime.getSecret({ id: SECRET_NAME }).result();
 
   // Use the secret's value
-  const secretAddress = secret.value
-  runtime.log(`Successfully fetched a secret! Address: ${secretAddress}`)
+  const secretAddress = secret.value;
+  runtime.log(`Successfully fetched a secret! Address: ${secretAddress}`);
 
   // ... now you can use the secretAddress in your logic ...
-  return "Success"
-}
+  return "Success";
+};
 
 // initWorkflow is the entry point for the workflow
 const initWorkflow = () => {
-  const cron = new cre.capabilities.CronCapability()
+  const cron = new cre.capabilities.CronCapability();
 
-  return [cre.handler(cron.trigger({ schedule: "0 */10 * * * *" }), onCronTrigger)]
-}
+  return [
+    cre.handler(cron.trigger({ schedule: "0 */10 * * * *" }), onCronTrigger),
+  ];
+};
 
 // main is the entry point for the WASM binary
 export async function main() {
-  const runner = await Runner.newRunner<Config>()
-  await runner.run(initWorkflow)
+  const runner = await Runner.newRunner<Config>();
+  await runner.run(initWorkflow);
 }
 
-main()
+main();
 ```
 
-## Quick reference: Common pitfalls in non-determinism 
+## Quick reference: Common pitfalls in non-determinism
 
 | Don't Use                    | Use Instead                                  |
 | ---------------------------- | -------------------------------------------- |
@@ -279,10 +321,21 @@ main()
 | `Date.now()` or `new Date()` | `runtime.now()`                              |
 | LLM free-text responses      | Structured output with field-level consensus |
 
+## Common Pitfalls Quick Reference
+
+| Issue                      | Symptom                             | Solution                                               |
+| -------------------------- | ----------------------------------- | ------------------------------------------------------ |
+| Missing function call      | "not a function" error              | Add `(config)` after `sendRequest()`                   |
+| Wrong cacheSettings fields | "key unknown" JSON error            | Use `store`/`maxAge`, not `readFromCache`/`maxAgeMs`   |
+| Secrets not found          | "[object Object]: secret not found" | Use config for dev, or `runInNodeMode` pattern         |
+| POST body not encoded      | Empty or malformed request          | Base64 encode: `Buffer.from(bytes).toString("base64")` |
+| Response body not decoded  | Cannot parse response               | Base64 decode: `Buffer.from(resp.body, "base64")`      |
+
 **Docs**: https://docs.chain.link/cre/guides/workflow/secrets/using-secrets-simulation-ts
 
 ## Getting Detailed Documentation
-**Important**: If you're not sure or need more details** (CLI options, SDK types, trigger configs, capability methods, etc.), run:
+
+**Important**: If you're not sure or need more details\*\* (CLI options, SDK types, trigger configs, capability methods, etc.), run:
 
 ```bash
 ./scripts/fetch-docs.sh

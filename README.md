@@ -10,8 +10,9 @@ This skill provides Claude with knowledge about CRE, including:
 - CLI commands for development and deployment
 - Trigger types (HTTP, Cron, EVM Log)
 - Capabilities (HTTPClient, EVMClient)
-- Secrets management and limits
+- Secrets management
 - Get chain selector name and id that provided by Chainlink
+- Optimal way to run multiple http calls
 
 ## Installation
 
@@ -112,17 +113,18 @@ All scripts output JSON for easy parsing.
 
 ## Templates
 
-| Template                   | Use Case                              |
-| -------------------------- | ------------------------------------- |
-| `workflow-get-request.ts`  | HTTP GET request example              |
-| `workflow-post-request.ts` | HTTP POST request example             |
-| `workflow-cron.ts`         | Scheduled jobs (min 30s interval)     |
-| `workflow-evm-log.ts`      | React to smart contract events        |
-| `workflow.yaml.template`   | Workflow metadata configuration       |
-| `config.json.template`     | Target configuration                  |
-| `project.yaml.template`    | Project-level CLI targets (RPCs, DON) |
-| `secrets.yaml.template`    | Secrets declaration                   |
-| `.env.template`            | Environment variables for simulation  |
+| Template                         | Use Case                                  |
+| -------------------------------- | ----------------------------------------- |
+| `workflow-get-request.ts`        | HTTP GET request example                  |
+| `workflow-post-request.ts`       | HTTP POST request example                 |
+| `workflow-cron.ts`               | Scheduled jobs (min 30s interval)         |
+| `workflow-evm-log.ts`            | React to smart contract events            |
+| `optimize-multiple-http-calls.ts`| Parallel HTTP calls with median consensus |
+| `workflow.yaml.template`         | Workflow metadata configuration           |
+| `config.json.template`           | Target configuration                      |
+| `project.yaml.template`          | Project-level CLI targets (RPCs, DON)     |
+| `secrets.yaml.template`          | Secrets declaration                       |
+| `.env.template`                  | Environment variables for simulation      |
 
 ## CRE Limits (Quick Reference)
 

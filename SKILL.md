@@ -208,18 +208,19 @@ myProject/
 
 ## Workflow Templates
 
-| Template                             | Use Case                              |
-| ------------------------------------ | ------------------------------------- |
-| `templates/workflow-get-request.ts`  | HTTP GET request handlers             |
-| `templates/workflow-post-request.ts` | HTTP POST request handlers            |
-| `templates/workflow-cron.ts`         | Scheduled jobs (min 30s)              |
-| `templates/workflow-evm-log.ts`      | Smart contract event listeners        |
-| `templates/workflow-using-secret.ts` | Workflow using secrets example        |
-| `templates/workflow.yaml.template`   | Workflow metadata                     |
-| `templates/config.json.template`     | Target configuration                  |
-| `templates/project.yaml.template`    | Project-level CLI targets (RPCs, DON) |
-| `templates/secrets.yaml.template`    | Secrets declaration                   |
-| `templates/.env.template`            | Environment variables for simulation  |
+| Template                                    | Use Case                                |
+| ------------------------------------------- | --------------------------------------- |
+| `templates/workflow-get-request.ts`         | HTTP GET request handlers               |
+| `templates/workflow-post-request.ts`        | HTTP POST request handlers              |
+| `templates/workflow-cron.ts`                | Scheduled jobs (min 30s)                |
+| `templates/workflow-evm-log.ts`             | Smart contract event listeners          |
+| `templates/workflow-using-secret.ts`        | Workflow using secrets example          |
+| `templates/optimize-multiple-http-calls.ts` | Parallel multiple HTTP calls with median consensus for optimization |
+| `templates/workflow.yaml.template`          | Workflow metadata                       |
+| `templates/config.json.template`            | Target configuration                    |
+| `templates/project.yaml.template`           | Project-level CLI targets (RPCs, DON)   |
+| `templates/secrets.yaml.template`           | Secrets declaration                     |
+| `templates/.env.template`                   | Environment variables for simulation    |
 
 ## Secrets Management
 
@@ -330,8 +331,7 @@ main();
 | Secrets not found          | "[object Object]: secret not found" | Use config for dev, or `runInNodeMode` pattern         |
 | POST body not encoded      | Empty or malformed request          | Base64 encode: `Buffer.from(bytes).toString("base64")` |
 | Response body not decoded  | Cannot parse response               | Base64 decode: `Buffer.from(resp.body, "base64")`      |
-
-**Docs**: https://docs.chain.link/cre/guides/workflow/secrets/using-secrets-simulation-ts
+| Multiple HTTP calls        | Inefficient consensus per call      | Batch all calls in one `sendRequest`, consensus once (see `optimize-multiple-http-calls.ts`) |
 
 ## Getting Detailed Documentation
 

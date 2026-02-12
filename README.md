@@ -55,7 +55,7 @@ After installation, restart Claude Code or run `/skills reload` to load the skil
 Initialize a new CRE project:
 
 ```bash
-cre init
+cre init --project-name my-cre-project --workflow-name my-workflow --template-id 3
 ```
 
 ### 3. Validate Your Workflow

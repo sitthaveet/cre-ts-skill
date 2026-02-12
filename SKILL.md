@@ -58,9 +58,23 @@ PS. workflow-path is a workflow-name or the folder that contains workflow.
 | **Handler**    | The main entry point using `cre.handler()`            |
 | **Secrets**    | Secure credentials accessed via `runtime.getSecret()` |
 
-## Avoid using secrets for local simulation
+## Secrets: Key vs Value Name Must Differ
 
-Even though CRE provides how to use secrets during local development and simulation, the secrets can be very buggy. If you're stuck with "secret not found". You can use config.json to hold the secret value instead.
+In `secrets.yaml`, the **key name** (logical secret ID) and the **value name** (env variable) **must be different**. Using the same name for both causes a confusing "secret not found" error.
+
+```yaml
+# WRONG - key and value are the same name, causes "secret not found"
+secretsNames:
+  EVM_ADDRESS:
+    - EVM_ADDRESS
+
+# CORRECT - key and value are different
+secretsNames:
+  EVM_ADDRESS:
+    - EVM_ADDRESS_VAR
+```
+
+If you're still stuck with "secret not found" after fixing this, you can use `config.json` to hold the value as a workaround.
 
 ## Basic Workflow Structure
 
@@ -232,8 +246,9 @@ Secrets (API keys, credentials) are declared in `secrets.yaml` and accessed via 
 
 If you encounter `error fetching [object Object]: secret not found` during local simulation:
 
-1. **Workaround for development**: Pass sensitive values via `config.json` temporarily.
-2. **For production with secrets**: Use the `runInNodeMode` pattern which provides `NodeRuntime` with more robust secrets access.
+1. **Most likely cause**: The key name and value name in `secrets.yaml` are the same. They **must be different** (e.g., `EVM_ADDRESS` key with `EVM_ADDRESS_ALL` value).
+2. **Workaround for development**: Pass sensitive values via `config.json` temporarily.
+3. **For production with secrets**: Use the `runInNodeMode` pattern which provides `NodeRuntime` with more robust secrets access.
 
 ### Alternative Pattern (runInNodeMode with secrets)
 
@@ -313,6 +328,82 @@ export async function main() {
 main();
 ```
 
+## Important Notes
+
+### HTTP Triggers Cannot Return Data
+
+HTTP-triggered workflows do **not** return your workflow output in the response. You only get an acknowledgment:
+
+```json
+{
+  "success": true,
+  "response": {
+    "workflow_id": "0x...",
+    "workflow_execution_id": "0x...",
+    "status": "ACCEPTED"
+  }
+}
+```
+
+If you need to send results back to a caller, use HTTPClient's `sendRequest` to make a callback to your service with the result. Be aware this counts toward the HTTP call quota (5 per execution).
+
+### All External Calls Must Go Through Capabilities
+
+You **cannot** import libraries and make direct API calls or EVM calls. Doing so causes:
+
+```
+panic: runtime error: invalid memory address or nil pointer dereference
+```
+
+All external interactions must go through CRE's capabilities system so DON nodes can coordinate and reach consensus:
+- API calls → `HTTPClient` capability
+- Blockchain reads → `EVMReadClient` capability
+- Blockchain writes → `EVMWriteClient` capability
+
+### Simulation With EVM Calls Requires --broadcast
+
+When simulating locally, if your workflow makes any EVM calls (reads or writes), you **must** pass the `--broadcast` flag:
+
+```bash
+cre workflow simulate my-workflow --target staging-settings --broadcast
+```
+
+Without it, EVM calls will fail during simulation.
+
+### Deployment Requires Whitelisting
+
+Only whitelisted accounts can deploy workflows to production CRE. You can simulate locally without restriction, but deploying to the DON requires Early Access approval from Chainlink.
+
+### Service Quotas
+
+CRE enforces strict limits. Design your workflows with these in mind:
+
+**Per-Account:**
+- Max **5 concurrent workflow executions** across all workflows
+- Workflow triggers: 5 per second (burst: 5)
+- Deploy: 1 workflow per minute
+- Max binary size: 100 MB (20 MB compressed)
+
+**Per-Workflow:**
+- Triggers fire at 1 per 30 seconds (burst: 3), max 10 triggers per workflow
+- 5-minute timeout, 100 MB memory
+- Max 5 concurrent instances
+- 100 KB response size limit
+
+**Capabilities:**
+- Max 3 concurrent capability calls
+- HTTP: 5 calls per execution, 10 KB response, 100 KB request
+- EVM read: 10 calls per execution, 100 blocks for log queries
+- EVM write: 5M gas quota, 1 KB report size, 10 target chains
+
+**Logging:**
+- 1 KB per line, 1,000 events per execution
+
+**EVM log triggers:**
+- Max 5 per workflow, monitor up to 5 contract addresses
+
+The 5-concurrent-execution limit means you must design queuing and retry logic in your application layer if you expect high throughput.
+
 ## Quick reference: Common pitfalls in non-determinism
 
 | Don't Use                    | Use Instead                                  |
@@ -328,10 +419,13 @@ main();
 | -------------------------- | ----------------------------------- | ------------------------------------------------------ |
 | Missing function call      | "not a function" error              | Add `(config)` after `sendRequest()`                   |
 | Wrong cacheSettings fields | "key unknown" JSON error            | Use `store`/`maxAge`, not `readFromCache`/`maxAgeMs`   |
-| Secrets not found          | "[object Object]: secret not found" | Use config for dev, or `runInNodeMode` pattern         |
+| Secrets not found          | "[object Object]: secret not found" | Ensure key and value names differ in `secrets.yaml`    |
 | POST body not encoded      | Empty or malformed request          | Base64 encode: `Buffer.from(bytes).toString("base64")` |
 | Response body not decoded  | Cannot parse response               | Base64 decode: `Buffer.from(resp.body, "base64")`      |
 | Multiple HTTP calls        | Inefficient consensus per call      | Batch all calls in one `sendRequest`, consensus once (see `optimize-multiple-http-calls.ts`) |
+| Direct external calls      | nil pointer / panic error           | All external calls must go through capabilities (HTTPClient, EVMClient)                      |
+| HTTP trigger returns data  | Only get "ACCEPTED" status          | Use HTTPClient callback to send results to your service                                      |
+| EVM calls fail in sim      | EVM errors during simulation        | Add `--broadcast` flag to simulate command                                                   |
 
 ## Getting Detailed Documentation
 

@@ -1,10 +1,10 @@
-# Chainlink Runtime Environment (CRE) Claude Code Skill
+# Chainlink Runtime Environment (CRE) Agent Skill
 
-A Claude Code Skill that makes Claude an expert in Chainlink Runtime Environment (CRE), enabling developers to build, test, and deploy CRE workflows efficiently.
+An Agent Skill that makes your agent an expert in Chainlink Runtime Environment (CRE), enabling developers to build, test, and deploy CRE workflows efficiently.
 
 ## Overview
 
-This skill provides Claude with knowledge about CRE, including:
+This skill provides your agent with knowledge about CRE, including:
 
 - TypeScript SDK for building workflows
 - CLI commands for development and deployment
@@ -16,9 +16,13 @@ This skill provides Claude with knowledge about CRE, including:
 
 ## Installation
 
-Install this skill to make it available to Claude Code.
+Use one of the installation paths below, depending on your agent.
 
-### Method 1: Git Clone
+### Claude Code
+
+Install into `~/.claude/skills`.
+
+#### Method 1: Git Clone
 
 ```bash
 # Clone the repository
@@ -29,7 +33,7 @@ mkdir -p ~/.claude/skills
 cp -r cre-ts-skill ~/.claude/skills/
 ```
 
-### Method 2: Direct Download
+#### Method 2: Direct Download
 
 ```bash
 # Create skills directory if it doesn't exist
@@ -41,6 +45,46 @@ curl -L https://github.com/sitthaveet/cre-ts-skill/archive/main.tar.gz | \
 ```
 
 After installation, restart Claude Code or run `/skills reload` to load the skill.
+
+### Codex
+
+Install into `$CODEX_HOME/skills` (default: `~/.codex/skills`).
+
+#### Method 1: Git Clone
+
+```bash
+# Clone the repository
+git clone https://github.com/sitthaveet/cre-ts-skill.git
+
+# Copy to Codex skills directory
+mkdir -p ~/.codex/skills
+cp -r cre-ts-skill ~/.codex/skills/
+```
+
+#### Method 2: Direct Download
+
+```bash
+# Create skills directory if it doesn't exist
+mkdir -p ~/.codex/skills/cre-ts-skill
+
+# Fetch and extract from GitHub
+curl -L https://github.com/sitthaveet/cre-ts-skill/archive/main.tar.gz | \
+  tar xz -C ~/.codex/skills/cre-ts-skill --strip-components=1
+```
+
+After installation, restart Codex to pick up new skills.
+
+### Cursor
+
+Cursor supports project-level agent instructions via `AGENTS.md` in your project root.
+
+```bash
+# Run from your Cursor project root
+curl -fsSL https://raw.githubusercontent.com/sitthaveet/cre-ts-skill/main/SKILL.md | \
+  awk 'BEGIN{infm=0} NR==1 && $0=="---"{infm=1; next} infm && $0=="---"{infm=0; next} !infm{print}' > AGENTS.md
+```
+
+After installation, start a new chat in Cursor so the new instructions are loaded.
 
 ## Quick Start
 
@@ -74,8 +118,7 @@ cre init --project-name my-cre-project --workflow-name my-workflow --template-id
 
 ```
 cre-ts-skill/
-├── SKILL.md                     # Main skill definition for Claude
-├── CLAUDE.md                    # Project guidelines
+├── SKILL.md                     # Main skill definition for the agent
 ├── README.md                    # This file
 ├── scripts/
 │   ├── fetch-docs.sh            # Fetch full docs from chain.link
@@ -95,7 +138,7 @@ cre-ts-skill/
 │   ├── secrets.yaml.template    # Secrets declaration template
 │   └── .env.template            # Environment variables template
 └── .claude/
-    └── settings.local.json      # Claude Code permissions
+    └── settings.local.json      # Agent permissions
 ```
 
 ## Scripts
@@ -139,11 +182,11 @@ All scripts output JSON for easy parsing.
 
 ## Documentation
 
-This skill uses on-demand documentation fetching. When Claude needs detailed information, it runs `./scripts/fetch-docs.sh` to get the latest official docs from:
+This skill uses on-demand documentation fetching. When the agent needs detailed information, it runs `./scripts/fetch-docs.sh` to get the latest official docs from:
 
 https://docs.chain.link/cre/llms-full-ts.txt
 
-This approach ensures Claude always has access to up-to-date information without maintaining local docs that can go stale.
+This approach ensures the agent always has access to up-to-date information without maintaining local docs that can go stale.
 
 ## Requirements
 

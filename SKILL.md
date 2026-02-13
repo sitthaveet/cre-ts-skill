@@ -42,7 +42,7 @@ cre init --project-name my-cre-project --workflow-name my-workflow --template-id
 # Get list of chain selectors (names and IDs)
 ./scripts/get-chain-selector.sh
 
-# Fetch full official docs (when unsure about details)
+# Fetch full official docs (fallback if topic-based lookup isn't enough)
 ./scripts/fetch-docs.sh
 ```
 
@@ -427,22 +427,32 @@ The 5-concurrent-execution limit means you must design queuing and retry logic i
 | HTTP trigger returns data  | Only get "ACCEPTED" status          | Use HTTPClient callback to send results to your service                                      |
 | EVM calls fail in sim      | EVM errors during simulation        | Add `--broadcast` flag to simulate command                                                   |
 
-## Getting Detailed Documentation
+## Runtime Documentation Lookup
 
-**Important**: If you're not sure or need more details\*\* (CLI options, SDK types, trigger configs, capability methods, etc.), run:
+When you need more details about CRE (CLI options, SDK types, trigger configs, etc.):
 
-```bash
-./scripts/fetch-docs.sh
-```
+1. **Match the user's question to a reference file** from the table below
+2. **Read the matching reference file** (e.g., `references/workflow-building.md`)
+3. **WebFetch 3-5 URLs** from that file — pick URLs whose labels best match the question
+4. **Synthesize a response** using the fetched content, citing source URLs
 
-This downloads the full official docs to `/tmp/cre-docs-full.txt`. Then read that file for accurate, up-to-date information.
+Do NOT rely on cached content. Always WebFetch to get the latest information.
 
-Use fetch-docs.sh when:
+| File | Topic | When to use |
+|------|-------|-------------|
+| `references/account-setup.md` | Account setup | Creating accounts, CLI login, auth |
+| `references/getting-started.md` | Getting started | CLI install, project setup, tutorial |
+| `references/capabilities.md` | Capabilities | EVM read/write, HTTP, triggers overview |
+| `references/workflow-building.md` | Workflow building | Secrets, time, triggers, HTTP/EVM clients, reports |
+| `references/cli-reference.md` | CLI reference | CLI commands for setup, secrets, workflows |
+| `references/sdk-reference.md` | SDK reference | SDK core, consensus, EVM/HTTP clients, triggers |
+| `references/operations.md` | Operations | Deploy, simulate, monitor, activate, pause, delete |
+| `references/concepts.md` | Concepts | Consensus, finality, non-determinism, WASM runtime |
+| `references/organization.md` | Organization | Org management, members, wallet keys |
+| `references/general.md` | General | CRE overview, key terms, templates, networks, quotas |
 
-- Unsure about specific API details or method signatures
-- Need exact CLI command options
-- User asks about advanced features
-- Troubleshooting unusual errors
-- Anything not covered in this quick reference
-
-Source: https://docs.chain.link/cre/llms-full-ts.txt
+**Tips:**
+- For workflow generation: start with `workflow-building.md`, supplement with `sdk-reference.md`
+- For onboarding: start with `getting-started.md`, then `account-setup.md`
+- Full docs index at `assets/cre-docs-index.md` if you need to search across all URLs
+- Fallback: `./scripts/fetch-docs.sh` downloads the full docs if the topic-based approach isn't enough

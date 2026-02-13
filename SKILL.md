@@ -58,24 +58,6 @@ PS. workflow-path is a workflow-name or the folder that contains workflow.
 | **Handler**    | The main entry point using `cre.handler()`            |
 | **Secrets**    | Secure credentials accessed via `runtime.getSecret()` |
 
-## Secrets: Key vs Value Name Must Differ
-
-In `secrets.yaml`, the **key name** (logical secret ID) and the **value name** (env variable) **must be different**. Using the same name for both causes a confusing "secret not found" error.
-
-```yaml
-# WRONG - key and value are the same name, causes "secret not found"
-secretsNames:
-  EVM_ADDRESS:
-    - EVM_ADDRESS
-
-# CORRECT - key and value are different
-secretsNames:
-  EVM_ADDRESS:
-    - EVM_ADDRESS_VAR
-```
-
-If you're still stuck with "secret not found" after fixing this, you can use `config.json` to hold the value as a workaround.
-
 ## Basic Workflow Structure
 
 ```typescript
@@ -250,84 +232,6 @@ If you encounter `error fetching [object Object]: secret not found` during local
 2. **Workaround for development**: Pass sensitive values via `config.json` temporarily.
 3. **For production with secrets**: Use the `runInNodeMode` pattern which provides `NodeRuntime` with more robust secrets access.
 
-### Alternative Pattern (runInNodeMode with secrets)
-
-```typescript
-const postWithSecret = (nodeRuntime: NodeRuntime<Config>): Response => {
-  const secret = nodeRuntime.getSecret({ id: "API_KEY" }).result();
-  const apiKey = secret.value;
-  // ... use apiKey
-};
-
-const onTrigger = (runtime: Runtime<Config>): string => {
-  const result = runtime
-    .runInNodeMode(postWithSecret, consensusIdenticalAggregation<Response>())()
-    .result();
-  return result;
-};
-```
-
-### Step 1: Define Secrets in secrets.yaml
-
-```yaml
-secretsNames:
-  MY_API_KEY: # Name used in code: runtime.getSecret("MY_API_KEY")
-    - MY_API_KEY_VAR # Environment variable name in .env file
-  DATABASE_URL:
-    - DATABASE_URL_VAR
-```
-
-### Step 2: Create .env File for Simulation
-
-```bash
-# .env (add to .gitignore!)
-MY_API_KEY_VAR=your_actual_api_key_here
-DATABASE_URL_VAR=postgres://user:pass@localhost:5432/db
-```
-
-### Step 3: Access Secrets in Workflow Code
-
-```typescript
-import { cre, Runner, type Runtime } from "@chainlink/cre-sdk";
-
-// Config can be an empty object if you don't need any parameters from config.json
-type Config = Record<string, never>;
-
-// Define the logical name of the secret as a constant for clarity
-const SECRET_NAME = "SECRET_ADDRESS";
-
-// onCronTrigger is the callback function that gets executed when the cron trigger fires
-// This is where you use the secret
-const onCronTrigger = (runtime: Runtime<Config>): string => {
-  // Call runtime.getSecret with the secret's logical ID
-  const secret = runtime.getSecret({ id: SECRET_NAME }).result();
-
-  // Use the secret's value
-  const secretAddress = secret.value;
-  runtime.log(`Successfully fetched a secret! Address: ${secretAddress}`);
-
-  // ... now you can use the secretAddress in your logic ...
-  return "Success";
-};
-
-// initWorkflow is the entry point for the workflow
-const initWorkflow = () => {
-  const cron = new cre.capabilities.CronCapability();
-
-  return [
-    cre.handler(cron.trigger({ schedule: "0 */10 * * * *" }), onCronTrigger),
-  ];
-};
-
-// main is the entry point for the WASM binary
-export async function main() {
-  const runner = await Runner.newRunner<Config>();
-  await runner.run(initWorkflow);
-}
-
-main();
-```
-
 ## Important Notes
 
 ### HTTP Triggers Cannot Return Data
@@ -346,29 +250,6 @@ HTTP-triggered workflows do **not** return your workflow output in the response.
 ```
 
 If you need to send results back to a caller, use HTTPClient's `sendRequest` to make a callback to your service with the result. Be aware this counts toward the HTTP call quota (5 per execution).
-
-### All External Calls Must Go Through Capabilities
-
-You **cannot** import libraries and make direct API calls or EVM calls. Doing so causes:
-
-```
-panic: runtime error: invalid memory address or nil pointer dereference
-```
-
-All external interactions must go through CRE's capabilities system so DON nodes can coordinate and reach consensus:
-- API calls → `HTTPClient` capability
-- Blockchain reads → `EVMReadClient` capability
-- Blockchain writes → `EVMWriteClient` capability
-
-### Simulation With EVM Calls Requires --broadcast
-
-When simulating locally, if your workflow makes any EVM calls (reads or writes), you **must** pass the `--broadcast` flag:
-
-```bash
-cre workflow simulate my-workflow --target staging-settings --broadcast
-```
-
-Without it, EVM calls will fail during simulation.
 
 ### Deployment Requires Whitelisting
 
@@ -419,7 +300,6 @@ The 5-concurrent-execution limit means you must design queuing and retry logic i
 | -------------------------- | ----------------------------------- | ------------------------------------------------------ |
 | Missing function call      | "not a function" error              | Add `(config)` after `sendRequest()`                   |
 | Wrong cacheSettings fields | "key unknown" JSON error            | Use `store`/`maxAge`, not `readFromCache`/`maxAgeMs`   |
-| Secrets not found          | "[object Object]: secret not found" | Ensure key and value names differ in `secrets.yaml`    |
 | POST body not encoded      | Empty or malformed request          | Base64 encode: `Buffer.from(bytes).toString("base64")` |
 | Response body not decoded  | Cannot parse response               | Base64 decode: `Buffer.from(resp.body, "base64")`      |
 | Multiple HTTP calls        | Inefficient consensus per call      | Batch all calls in one `sendRequest`, consensus once (see `optimize-multiple-http-calls.ts`) |

@@ -19,8 +19,7 @@ import {
 import { z } from "zod";
 
 const configSchema = z.object({
-  schedule: z.string().default("0 */5 * * * *"), // Every 5 minutes
-  timezone: z.string().optional().default("UTC"),
+  schedule: z.string().default("0 */5 * * * *"), // Every 5 minutes (UTC)
 });
 
 type Config = z.infer<typeof configSchema>;
@@ -93,7 +92,6 @@ const initWorkflow = (config: Config) => {
     cre.handler(
       new cre.capabilities.CronCapability().trigger({
         schedule: config.schedule,
-        timezone: config.timezone,
       }),
       onCronTrigger,
     ),
